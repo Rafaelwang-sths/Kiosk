@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interact | Sign-On Kiosk</title>
+  <script src="https://cdn.jsdelivr.net/npm/@pier-wallet/html5-qrcode@2.3.12/html5-qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --interact-blue: #0061a8;
+      --interact-cyan: #00b9e8;
+      --bg-light: linear-gradient(135deg, #e1f5fe, #ffffff);
+      --bg-dark: linear-gradient(135deg, #0f172a, #1e293b);
+      --text-light: #ffffff;
+      --text-dark: #0f172a;
+      --success-bg: #d1fae5;
+      --success-color: #065f46;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 2rem;
+      transition: background 0.4s ease;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: var(--bg-dark);
+        color: var(--text-light);
+      }
+
+      #reader-wrapper {
+        background: #1e293b;
+      }
+
+      #tick {
+        background: #134e4a;
+        color: #a7f3d0;
+      }
+
+      footer {
+        color: #9ca3af;
+      }
+
+      #loadingOverlay {
+        background: rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    @media (prefers-color-scheme: light) {
+      body {
+        background: var(--bg-light);
+        color: var(--text-dark);
+      }
+
+      #reader-wrapper {
+        background: white;
+      }
+
+      #tick {
+        background: var(--success-bg);
+        color: var(--success-color);
+      }
+
+      footer {
+        color: #4b5563;
+      }
+
+      #loadingOverlay {
+        background: rgba(255, 255, 255, 0.85);
+      }
+    }
+
+    /* LOGIN BOX */
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #login-box {
+      background: white;
+      padding: 3rem;
+      border-radius: 20px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+      max-width: 400px;
+      width: 90%;
+    }
+
+    #login-box img {
+      height: 80px;
+      margin-bottom: 1rem;
+    }
+
+    #login-box h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.5rem 0;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.9rem;
+      background-color: var(--interact-blue);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1rem;
+      margin-top: 1rem;
+      cursor: pointer;
+    }
+
+    .error {
+      color: red;
+      margin-top: 0.8rem;
+      font-weight: 500;
+    }
+
+    /* MAIN UI (initially hidden) */
+    #main-ui {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+
+    .header .logo {
+      height: 100px;
+      margin-right: 1rem;
+    }
+
+    .header .time {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .header .date {
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: #bbb;
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    #reader-wrapper {
+      position: relative;
+      width: 340px;
+      max-width: 90vw;
+      border-radius: 20px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #reader {
+      transform: scaleX(-1);
+      width: 100%;
+      height: auto;
+    }
+
+    #loadingOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      backdrop-filter: blur(5px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      transition: all 0.3s ease;
+    }
+
+    .spinner {
+      width: 45px;
+      height: 45px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--interact-cyan);
+      border-radius: 50%;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #tick {
+      display: none;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      margin-top: 2rem;
+      animation: fadeIn 0.4s ease-in-out;
+      width: 300px;
+      max-width: 90vw;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    #tick svg {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 1rem;
+    }
+
+    #close-btn {
+      margin-top: 1rem;
+      padding: 0.5rem 1.5rem;
+      background-color: var(--interact-blue);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    iframe {
+      display: none;
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 0.85rem;
+    }
+
+    #build {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <div id="login-box">
+      <img src="./assets/logo.png" alt="Interact Logo">
+      <h2>Interact Sign-On Kiosk</h2>
+      <input type="text" id="username" placeholder="Username">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="login()">Unlock</button>
+      <div class="error" id="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- MAIN UI -->
+  <div id="main-ui">
+    <div class="header">
+      <img src="./assets/logo.png" alt="Interact Logo" class="logo">
+      <div>
+        <span class="time" id="current-time">00:00</span><br>
+        <span class="date" id="current-date">Monday 1st January</span>
+      </div>
+    </div>
+
+    <h2>Scan your Membership Card</h2>
+
+    <div id="reader-wrapper">
+      <div id="reader"></div>
+      <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <span>Processing Form...</span>
+      </div>
+    </div>
+
+    <iframe id="formFrame" src="" onload="checkFormLoad()"></iframe>
+
+    <div id="tick">
+      <svg fill="currentColor" viewBox="0 0 16 16">
+        <path d="M13.485 1.929a1 1 0 0 1 0 1.414L6.414 10.414l-3.9-3.9a1 1 0 0 1 1.414-1.414L6.414 7.586l6.657-6.657a1 1 0 0 1 1.414 0z"/>
+      </svg>
+      <p><strong>Attendance Recorded</strong></p>
+      <button id="close-btn" onclick="closeTick()">Close</button>
+    </div>
+
+    <footer>Built for Interact</footer>
+  </div>
+
+  <script>
+    const VALID_USERNAME = "admin";
+    const VALID_PASSWORD = "8141";
+    let formLoadedOnce = false;
+    let html5QrCode;
+
+    function login() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      if (u === VALID_USERNAME && p === VALID_PASSWORD) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-ui').style.display = 'flex';
+        startScanner();
+        updateClock();
+      } else {
+        document.getElementById('error-msg').textContent = "Incorrect username or password.";
+      }
+    }
+
+    function checkFormLoad() {
+      if (!formLoadedOnce) {
+        formLoadedOnce = true;
+        return;
+      }
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('tick').style.display = 'block';
+      setTimeout(() => {
+        document.getElementById('tick').style.display = 'none';
+        document.getElementById('formFrame').src = '';
+        formLoadedOnce = false;
+        startScanner();
+      }, 2000);
+    }
+
+    function closeTick() {
+      document.getElementById('tick').style.display = 'none';
+      document.getElementById('formFrame').src = '';
+      formLoadedOnce = false;
+      startScanner();
+    }
+
+    function startScanner() {
+      const reader = document.getElementById("reader");
+      reader.innerHTML = "";
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          if (qrCodeMessage.includes("https://docs.google.com/forms")) {
+            html5QrCode.stop().then(() => {
+              document.getElementById("loadingOverlay").style.display = "flex";
+              document.getElementById("formFrame").src = qrCodeMessage;
+            });
+          } else {
+            alert("Please scan a valid Google Form QR code.");
+          }
+        },
+        error => { /* ignore scan errors */ }
+      ).catch(err => {
+        alert("Camera access failed: " + err);
+      });
+    }
+
+    function updateClock() {
+      const timeDisplay = document.getElementById('current-time');
+      const dateDisplay = document.getElementById('current-date');
+      setInterval(() => {
+        const now = new Date();
+        timeDisplay.textContent = now.toLocaleTimeString();
+        dateDisplay.textContent = `${now.toLocaleString('en-US', { weekday: 'long' })} ${now.getDate()}${getOrdinal(now.getDate())} ${now.toLocaleString('en-US', { month: 'long' })}`;
+      }, 1000);
+    }
+
+    function getOrdinal(n) {
+      const s = ["th", "st", "nd", "rd"], v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    }
+  </script>
+</body>
+</html>
